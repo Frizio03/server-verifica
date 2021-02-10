@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Viewer</title>
+  <style>
+    body {
+      font-family: monospace;
+    }
+
+    p {
+      line-height: 25px;
+    }
+
+    code {
+      background: #ffd7d7;
+      border: solid 1px #ff7d7d;
+      padding: 2px;
+    }
+
+    .correct {
+      color: green;
+    }
+    
+    .wrong {
+      color: red;
+    }
+    
+    #student-container .student-block:nth-child(-n+3) {
+
+    }
+
+    .student-block {
+      display: block;
+      width: 100%
+    }
+
+    .student-block {
+      list-style: none;
+      display: inline-block;
+      margin: 10px;
+      padding: 10px;
+      border: solid 1px black;
+    }
+    
+    button {
+      margin: 2px;
+    }
+    
+    #code-container {
+      position: fixed;
+      width: 49%;
+      height: 40%;
+      right: 10px;
+      top: 10px;
+      display: none;
+    }
+    
+    #content {
+      width: 100%
+    }
+    
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.45.0/codemirror.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.45.0/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.45.0/addon/edit/matchbrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.45.0/mode/python/python.min.js"></script>
+</head>
+<body>
+<h1>Viewer</h1>
+<table>
+  <tr>
+    <td>
+      <div id = "content"></div>
+    </td>
+    <td>
+      <div id = "code-container">
+        <textarea id = "code"></textarea>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<script>
+  const cm = CodeMirror.fromTextArea(document.getElementById("code"), {
+    mode: {
+      name: "python",
+      version: 3,
+      singleLineStringErrors: false
+    },
+    lineNumbers: true,
+    indentUnit: 4,
+    matchBrackets: true
+  })
+</script>
+
+<script type="text/javascript">
+
+  const content = document.getElementById("content")
+  const textarea = document.getElementById("code")
+  let buttonIds = []
+
+  function showCode(text) {
+    cm.setValue(text)
+  }
+
+  
+  fetch("/esercizi")
+    .then(res => res.json())
+    .then(esercizi => {
+      const drawExButton = (exNumber, { code, points }, { nome }) => {
+        
+        
+        return `<button class="${points === 0 ? "wrong": "correct"}" onclick='showCode(${JSON.stringify(code)})'>${exNumber}</button>`
+      }
+      
+      const draw = () => {
+        fetch("/risultati")
+          .then(res => res.json())
+          .then(utenti => {
+            content.innerHTML = utenti
+              .filter(({ nome }) => nome)
+              .sort((a, b) => b.score - a.score)
+              .reduce((acc, user) => {
+                const { nome, score, fromStart, ex } = user
+                return acc += `
+<li>
+  <ul class='student-block'>
+    <li>nome: ${nome}</li>
+    <li>score: ${score}</li>
+    <li>consegnato in: ${fromStart || "mai"}</li>
+    <li>esercizi consegnati: ${ Object.entries(ex)
+                  .map(([exNumber, ex]) => drawExButton(exNumber, ex, user))
+                  .join("") || "nessuno"}</li>
+    <li>esercizi superati: ${ Object.entries(ex)
+                  .filter(([, ex]) => {
+                    const { points } = ex
+                    return points > 0
+                  })
+                  .map(([exNumber, ex]) => drawExButton(exNumber, ex, user))
+                  .join("") || "nessuno"}</li>
+    <li><progress value="${Object.values(ex).filter(({points}) => points > 0).length}" max="${esercizi.length}"></progress></li>
+  </ul>
+</li>`
+              }, "<ol id='student-container'>") + "</ol>" 
+
+          })
+          .catch(console.error)
+      }
+
+      setInterval(draw, 2000)
+      draw()
+    })
+    .catch(console.error)
+
+</script>
+</body>
+</html>
